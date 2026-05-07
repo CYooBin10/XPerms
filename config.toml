@@ -1,0 +1,13 @@
+# ============================================================
+# XPerms — Configuration
+# ============================================================
+
+# Tên group mặc định cho người chơi mới (khi chưa được set group)
+default_group = "default"
+
+# Định dạng chat. Các placeholder:
+#   {prefix}  — Prefix của group
+#   {suffix}  — Suffix của group
+#   {name}    — Tên người chơi
+#   {message} — Nội dung tin nhắn
+chat_format = "{prefix} {name}{suffix}§r: {message}"

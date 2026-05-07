@@ -1,0 +1,10 @@
+{
+  "groups": {
+    "default": {
+      "prefix": "§7[Member]",
+      "suffix": "",
+      "permissions": []
+    }
+  },
+  "users": {}
+}

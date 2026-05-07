@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "endstone-xperms"
+version = "1.0.0"
+dependencies = ["typing_extensions>=4.0"]
+authors = [
+    { name = "HuyBao" },
+]
+description = "Lightweight permission, rank & prefix plugin for Endstone (Bedrock)"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = ["endstone", "ruff"]
+
+[project.entry-points."endstone"]
+xperms = "endstone_xperms:XPermsPlugin"
