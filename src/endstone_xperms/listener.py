@@ -6,11 +6,9 @@ Lắng nghe các sự kiện PlayerChatEvent và PlayerJoinEvent để:
 - Cập nhật name tag (tên hiển thị trên đầu) khi người chơi vào server.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
-from endstone import ColorFormat
+from endstone import ColorFormat, Player
 from endstone.event import (
     EventPriority,
     PlayerChatEvent,
@@ -25,7 +23,7 @@ if TYPE_CHECKING:
 class XPermsListener:
     """Listener xử lý chat format và name tag cho XPerms."""
 
-    def __init__(self, plugin: XPermsPlugin) -> None:
+    def __init__(self, plugin: "XPermsPlugin") -> None:
         self._plugin = plugin
 
     # ------------------------------------------------------------------ #
@@ -34,7 +32,6 @@ class XPermsListener:
 
     @event_handler(priority=EventPriority.HIGH)
     def on_player_chat(self, event: PlayerChatEvent) -> None:
-        """Thay đổi format chat để hiển thị prefix và suffix của group."""
         player = event.player
         storage = self._plugin.storage
 
@@ -44,7 +41,7 @@ class XPermsListener:
         suffix = group.get("suffix", "")
 
         # Lấy chat format từ config
-        chat_format = self._plugin.config.get("chat_format", "{prefix} {name}{suffix}§r: {message}")
+        chat_format = group.get("chat_format", "{prefix} {name}{suffix}§r: {message}")
 
         # Thay thế placeholder bằng giá trị thực
         formatted = chat_format.replace("{prefix}", prefix)
@@ -68,10 +65,12 @@ class XPermsListener:
         player = event.player
         storage = self._plugin.storage
 
+        group = storage.get_user_group(player.name)
+
         # Nếu player chưa có group -> gán group mặc định
-        default_group = self._plugin.config.get("default_group", "default")
-        current_group_name = storage.get_user_group_name(player.name)
-        if storage.get_group(current_group_name) is None:
+        default_group = group.get("default_group", "default")
+        # Kiểm tra nếu player là người chơi mới (chưa có entry trong storage)
+        if player.name.lower() not in storage._data["users"]:
             storage.set_user_group(player.name, default_group)
 
         # Cập nhật name tag (tên hiển thị trên đầu người chơi)
@@ -88,7 +87,7 @@ class XPermsListener:
     #  Helper — Áp dụng name tag và permissions
     # ------------------------------------------------------------------ #
 
-    def _apply_name_tag(self, player) -> None:
+    def _apply_name_tag(self, player: Player) -> None:
         """Đặt name tag cho player theo format: [Prefix] PlayerName."""
         storage = self._plugin.storage
         group = storage.get_user_group(player.name)
@@ -99,7 +98,7 @@ class XPermsListener:
         else:
             player.name_tag = player.name
 
-    def _apply_permissions(self, player) -> None:
+    def _apply_permissions(self, player: Player) -> None:
         """Gán tất cả permissions của group cho player thông qua PermissionAttachment."""
         storage = self._plugin.storage
         group = storage.get_user_group(player.name)

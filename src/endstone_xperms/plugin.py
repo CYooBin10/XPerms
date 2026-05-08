@@ -34,15 +34,16 @@ class XPermsPlugin(Plugin):
             "description": "Quản lý group, rank và permission của người chơi",
             "usages": [
                 "/xperms groups",
-                "/xperms group <name: str> create",
-                "/xperms group <name: str> delete",
-                "/xperms group <name: str> info",
-                "/xperms group <name: str> setprefix <prefix: message>",
-                "/xperms group <name: str> setsuffix <suffix: message>",
-                "/xperms group <name: str> addperm <perm: str>",
-                "/xperms group <name: str> removeperm <perm: str>",
-                "/xperms user <player: str> setgroup <group: str>",
-                "/xperms user <player: str> info",
+                "/xperms create <name: str>",
+                "/xperms delete <name: str>",
+                "/xperms info <name: str>",
+                "/xperms setformat <name: str> <prefix: message>",
+                "/xperms setprefix <name: str> <prefix: message>",
+                "/xperms setsuffix <name: str> <suffix: message>",
+                "/xperms addperm <name: str> <perm: str>",
+                "/xperms removeperm <name: str> <perm: str>",
+                "/xperms setgroup <player: str> <group: str>",
+                "/xperms playerinfo <player: str>",
                 "/xperms reload",
             ],
             "permissions": ["xperms.admin"],
@@ -68,10 +69,10 @@ class XPermsPlugin(Plugin):
     def on_enable(self) -> None:
         """Được gọi khi plugin bật. Khởi tạo storage và đăng ký event listener."""
         # Lưu file config mặc định (config.toml) vào thư mục plugin nếu chưa có
-        self.save_default_config()
+        # self.save_default_config()
 
         # Khởi tạo storage (đọc data.json)
-        self.storage = Storage(self.data_folder)
+        self.storage = Storage(str(self.data_folder))
 
         # Đăng ký listener cho các sự kiện (chat, join)
         self._listener = XPermsListener(self)
@@ -109,15 +110,34 @@ class XPermsPlugin(Plugin):
             self._send_help(sender)
             return True
 
-        sub = args[0].lower()
+        action = args[0].lower()
 
-        if sub == "groups":
+        # Group management
+        if action == "groups":
             return self._cmd_groups(sender)
-        elif sub == "group" and len(args) >= 3:
-            return self._cmd_group(sender, args[1], args[2].lower(), args[3:])
-        elif sub == "user" and len(args) >= 3:
-            return self._cmd_user(sender, args[1], args[2].lower(), args[3:])
-        elif sub == "reload":
+        elif action == "create" and len(args) >= 2:
+            return self._cmd_create_group(sender, args[1])
+        elif action == "delete" and len(args) >= 2:
+            return self._cmd_delete_group(sender, args[1])
+        elif action == "info" and len(args) >= 2:
+            return self._cmd_group_info(sender, args[1])
+        elif action == "setprefix" and len(args) >= 3:
+            return self._cmd_set_prefix(sender, args[1], args[2:])
+        elif action == "setsuffix" and len(args) >= 3:
+            return self._cmd_set_suffix(sender, args[1], args[2:])
+        elif action == "setformat" and len(args) >= 3:
+            return self._cmd_set_format(sender, args[1], args[2])
+        elif action == "addperm" and len(args) >= 3:
+            return self._cmd_add_perm(sender, args[1], args[2])
+        elif action == "removeperm" and len(args) >= 3:
+            return self._cmd_remove_perm(sender, args[1], args[2])
+        # Player management
+        elif action == "setgroup" and len(args) >= 3:
+            return self._cmd_set_group(sender, args[1], args[2])
+        elif action == "playerinfo" and len(args) >= 2:
+            return self._cmd_player_info(sender, args[1])
+        # Other
+        elif action == "reload":
             return self._cmd_reload(sender)
         else:
             self._send_help(sender)
@@ -143,150 +163,132 @@ class XPermsPlugin(Plugin):
         return True
 
     # ================================================================== #
-    #  Lệnh: /xperms group <name> <action> [args...]
+    #  Group Commands
     # ================================================================== #
 
-    def _cmd_group(self, sender: CommandSender, group_name: str, action: str, extra: list[str]) -> bool:
-        """Xử lý các lệnh con cho group."""
+    def _cmd_create_group(self, sender: CommandSender, group_name: str) -> bool:
+        """Tạo group mới: /xperms create <name>"""
+        if self.storage.create_group(group_name):
+            sender.send_message(f"{ColorFormat.GREEN}Group '{group_name}' created successfully!")
+        else:
+            sender.send_error_message(f"Group '{group_name}' already exists!")
+        return True
 
-        if action == "create":
-            if self.storage.create_group(group_name):
-                sender.send_message(f"{ColorFormat.GREEN}Group '{group_name}' created successfully!")
-            else:
-                sender.send_error_message(f"Group '{group_name}' already exists!")
+    def _cmd_delete_group(self, sender: CommandSender, group_name: str) -> bool:
+        """Xóa group: /xperms delete <name>"""
+        if group_name.lower() == "default":
+            sender.send_error_message("Cannot delete the 'default' group!")
             return True
+        if self.storage.delete_group(group_name):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Group '{group_name}' deleted. "
+                f"Affected users moved to 'default'."
+            )
+            self._refresh_online_players()
+        else:
+            sender.send_error_message(f"Group '{group_name}' does not exist!")
+        return True
 
-        if action == "delete":
-            if group_name.lower() == "default":
-                sender.send_error_message("Cannot delete the 'default' group!")
-                return True
-            if self.storage.delete_group(group_name):
-                sender.send_message(
-                    f"{ColorFormat.GREEN}Group '{group_name}' deleted. "
-                    f"Affected users moved to 'default'."
-                )
-                # Cập nhật name tag cho các player online bị ảnh hưởng
-                self._refresh_online_players()
-            else:
-                sender.send_error_message(f"Group '{group_name}' does not exist!")
+    def _cmd_group_info(self, sender: CommandSender, group_name: str) -> bool:
+        """Xem thông tin group: /xperms info <name>"""
+        group = self.storage.get_group(group_name)
+        if group is None:
+            sender.send_error_message(f"Group '{group_name}' does not exist!")
             return True
+        sender.send_message(f"{ColorFormat.GOLD}===== Group: {group_name} =====")
+        sender.send_message(f"{ColorFormat.YELLOW}Prefix: {ColorFormat.RESET}{group.get('prefix', '')}")
+        sender.send_message(f"{ColorFormat.YELLOW}Suffix: {ColorFormat.RESET}{group.get('suffix', '')}")
+        perms = group.get("permissions", [])
+        sender.send_message(f"{ColorFormat.YELLOW}Permissions ({len(perms)}):")
+        for p in perms:
+            sender.send_message(f"{ColorFormat.GRAY}  - {ColorFormat.WHITE}{p}")
+        return True
 
-        if action == "info":
-            group = self.storage.get_group(group_name)
-            if group is None:
-                sender.send_error_message(f"Group '{group_name}' does not exist!")
-                return True
-            sender.send_message(f"{ColorFormat.GOLD}===== Group: {group_name} =====")
-            sender.send_message(f"{ColorFormat.YELLOW}Prefix: {ColorFormat.RESET}{group.get('prefix', '')}")
-            sender.send_message(f"{ColorFormat.YELLOW}Suffix: {ColorFormat.RESET}{group.get('suffix', '')}")
-            perms = group.get("permissions", [])
-            sender.send_message(f"{ColorFormat.YELLOW}Permissions ({len(perms)}):")
-            for p in perms:
-                sender.send_message(f"{ColorFormat.GRAY}  - {ColorFormat.WHITE}{p}")
-            return True
 
-        if action == "setprefix":
-            if not extra:
-                sender.send_error_message("Usage: /xperms group <name> setprefix <prefix>")
-                return False
-            prefix = " ".join(extra)  # Hỗ trợ prefix có khoảng trắng
-            if self.storage.set_prefix(group_name, prefix):
-                sender.send_message(
-                    f"{ColorFormat.GREEN}Prefix of '{group_name}' set to: {ColorFormat.RESET}{prefix}"
-                )
-                self._refresh_online_players()
-            else:
-                sender.send_error_message(f"Group '{group_name}' does not exist!")
-            return True
+    def _cmd_set_format(self, sender: CommandSender, group_name: str, format: str) -> bool:
+        if self.storage.set_format(group_name, format):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Chat format of '{group_name}' set to: {ColorFormat.RESET}{format}"
+            )
+            self._refresh_online_players()
+        else:
+            sender.send_error_message(f"Group '{group_name}' does not exist!")
+        return True
 
-        if action == "setsuffix":
-            if not extra:
-                sender.send_error_message("Usage: /xperms group <name> setsuffix <suffix>")
-                return False
-            suffix = " ".join(extra)
-            if self.storage.set_suffix(group_name, suffix):
-                sender.send_message(
-                    f"{ColorFormat.GREEN}Suffix of '{group_name}' set to: {ColorFormat.RESET}{suffix}"
-                )
-                self._refresh_online_players()
-            else:
-                sender.send_error_message(f"Group '{group_name}' does not exist!")
-            return True
+    def _cmd_set_prefix(self, sender: CommandSender, group_name: str, extra: list[str]) -> bool:
+        prefix = " ".join(extra)
+        if self.storage.set_prefix(group_name, prefix):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Prefix of '{group_name}' set to: {ColorFormat.RESET}{prefix}"
+            )
+            self._refresh_online_players()
+        else:
+            sender.send_error_message(f"Group '{group_name}' does not exist!")
+        return True
 
-        if action == "addperm":
-            if not extra:
-                sender.send_error_message("Usage: /xperms group <name> addperm <permission>")
-                return False
-            perm = extra[0]
-            if self.storage.add_permission(group_name, perm):
-                sender.send_message(
-                    f"{ColorFormat.GREEN}Permission '{perm}' added to group '{group_name}'."
-                )
-            else:
-                sender.send_error_message(
-                    f"Group '{group_name}' does not exist or already has this permission."
-                )
-            return True
+    def _cmd_set_suffix(self, sender: CommandSender, group_name: str, extra: list[str]) -> bool:
+        """Đặt suffix: /xperms setsuffix <name> <suffix>"""
+        suffix = " ".join(extra)
+        if self.storage.set_suffix(group_name, suffix):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Suffix of '{group_name}' set to: {ColorFormat.RESET}{suffix}"
+            )
+            self._refresh_online_players()
+        else:
+            sender.send_error_message(f"Group '{group_name}' does not exist!")
+        return True
 
-        if action == "removeperm":
-            if not extra:
-                sender.send_error_message("Usage: /xperms group <name> removeperm <permission>")
-                return False
-            perm = extra[0]
-            if self.storage.remove_permission(group_name, perm):
-                sender.send_message(
-                    f"{ColorFormat.GREEN}Permission '{perm}' removed from group '{group_name}'."
-                )
-            else:
-                sender.send_error_message(
-                    f"Group '{group_name}' does not exist or doesn't have this permission."
-                )
-            return True
+    def _cmd_add_perm(self, sender: CommandSender, group_name: str, perm: str) -> bool:
+        """Thêm permission: /xperms addperm <name> <perm>"""
+        if self.storage.add_permission(group_name, perm):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Permission '{perm}' added to group '{group_name}'."
+            )
+        else:
+            sender.send_error_message(
+                f"Group '{group_name}' does not exist or already has this permission."
+            )
+        return True
 
-        # Lệnh không hợp lệ
-        sender.send_error_message(
-            f"Unknown group action: '{action}'. "
-            f"Use: create, delete, info, setprefix, setsuffix, addperm, removeperm"
-        )
+    def _cmd_remove_perm(self, sender: CommandSender, group_name: str, perm: str) -> bool:
+        """Xóa permission: /xperms removeperm <name> <perm>"""
+        if self.storage.remove_permission(group_name, perm):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Permission '{perm}' removed from group '{group_name}'."
+            )
+        else:
+            sender.send_error_message(
+                f"Group '{group_name}' does not exist or doesn't have this permission."
+            )
         return True
 
     # ================================================================== #
-    #  Lệnh: /xperms user <player> <action> [args...]
+    #  Player Commands
     # ================================================================== #
 
-    def _cmd_user(self, sender: CommandSender, player_name: str, action: str, extra: list[str]) -> bool:
-        """Xử lý các lệnh con cho user."""
+    def _cmd_set_group(self, sender: CommandSender, player_name: str, group_name: str) -> bool:
+        """Gán group cho player: /xperms setgroup <player> <group>"""
+        if self.storage.set_user_group(player_name, group_name):
+            sender.send_message(
+                f"{ColorFormat.GREEN}Player '{player_name}' is now in group '{group_name}'."
+            )
+            # Cập nhật name tag nếu player đang online
+            online_player = self.server.get_player(player_name)
+            if online_player:
+                self._listener._apply_name_tag(online_player)
+                self._listener._apply_permissions(online_player)
+        else:
+            sender.send_error_message(f"Group '{group_name}' does not exist!")
+        return True
 
-        if action == "setgroup":
-            if not extra:
-                sender.send_error_message("Usage: /xperms user <player> setgroup <group>")
-                return False
-            group_name = extra[0]
-            if self.storage.set_user_group(player_name, group_name):
-                sender.send_message(
-                    f"{ColorFormat.GREEN}Player '{player_name}' is now in group '{group_name}'."
-                )
-                # Cập nhật name tag nếu player đang online
-                online_player = self.server.get_player(player_name)
-                if online_player:
-                    self._listener._apply_name_tag(online_player)
-                    self._listener._apply_permissions(online_player)
-            else:
-                sender.send_error_message(f"Group '{group_name}' does not exist!")
-            return True
-
-        if action == "info":
-            group_name = self.storage.get_user_group_name(player_name)
-            group = self.storage.get_user_group(player_name)
-            sender.send_message(f"{ColorFormat.GOLD}===== User: {player_name} =====")
-            sender.send_message(f"{ColorFormat.YELLOW}Group: {ColorFormat.WHITE}{group_name}")
-            sender.send_message(f"{ColorFormat.YELLOW}Prefix: {ColorFormat.RESET}{group.get('prefix', '')}")
-            sender.send_message(f"{ColorFormat.YELLOW}Suffix: {ColorFormat.RESET}{group.get('suffix', '')}")
-            return True
-
-        sender.send_error_message(
-            f"Unknown user action: '{action}'. Use: setgroup, info"
-        )
+    def _cmd_player_info(self, sender: CommandSender, player_name: str) -> bool:
+        """Xem thông tin player: /xperms playerinfo <player>"""
+        group_name = self.storage.get_user_group_name(player_name)
+        group = self.storage.get_user_group(player_name)
+        sender.send_message(f"{ColorFormat.GOLD}===== Player: {player_name} =====")
+        sender.send_message(f"{ColorFormat.YELLOW}Group: {ColorFormat.WHITE}{group_name}")
+        sender.send_message(f"{ColorFormat.YELLOW}Prefix: {ColorFormat.RESET}{group.get('prefix', '')}")
+        sender.send_message(f"{ColorFormat.YELLOW}Suffix: {ColorFormat.RESET}{group.get('suffix', '')}")
         return True
 
     # ================================================================== #
@@ -296,7 +298,7 @@ class XPermsPlugin(Plugin):
     def _cmd_reload(self, sender: CommandSender) -> bool:
         """Tải lại dữ liệu từ file data.json và config."""
         self.storage.load()
-        self.reload_config()
+        # self.reload_config()
         self._refresh_online_players()
         sender.send_message(
             f"{ColorFormat.GREEN}XPerms data & config reloaded! "
@@ -321,23 +323,23 @@ class XPermsPlugin(Plugin):
         """Gửi tin nhắn hướng dẫn sử dụng lệnh /xperms."""
         sender.send_message(f"{ColorFormat.GOLD}===== XPerms Help =====")
         sender.send_message(f"{ColorFormat.YELLOW}/xperms groups {ColorFormat.GRAY}— List all groups")
-        sender.send_message(f"{ColorFormat.YELLOW}/xperms group <name> create {ColorFormat.GRAY}— Create group")
-        sender.send_message(f"{ColorFormat.YELLOW}/xperms group <name> delete {ColorFormat.GRAY}— Delete group")
-        sender.send_message(f"{ColorFormat.YELLOW}/xperms group <name> info {ColorFormat.GRAY}— Show group info")
+        sender.send_message(f"{ColorFormat.YELLOW}/xperms create <name> {ColorFormat.GRAY}— Create group")
+        sender.send_message(f"{ColorFormat.YELLOW}/xperms delete <name> {ColorFormat.GRAY}— Delete group")
+        sender.send_message(f"{ColorFormat.YELLOW}/xperms info <name> {ColorFormat.GRAY}— Show group info")
         sender.send_message(
-            f"{ColorFormat.YELLOW}/xperms group <name> setprefix <prefix> {ColorFormat.GRAY}— Set prefix"
+            f"{ColorFormat.YELLOW}/xperms setprefix <name> <prefix> {ColorFormat.GRAY}— Set prefix"
         )
         sender.send_message(
-            f"{ColorFormat.YELLOW}/xperms group <name> setsuffix <suffix> {ColorFormat.GRAY}— Set suffix"
+            f"{ColorFormat.YELLOW}/xperms setsuffix <name> <suffix> {ColorFormat.GRAY}— Set suffix"
         )
         sender.send_message(
-            f"{ColorFormat.YELLOW}/xperms group <name> addperm <perm> {ColorFormat.GRAY}— Add permission"
+            f"{ColorFormat.YELLOW}/xperms addperm <name> <perm> {ColorFormat.GRAY}— Add permission"
         )
         sender.send_message(
-            f"{ColorFormat.YELLOW}/xperms group <name> removeperm <perm> {ColorFormat.GRAY}— Remove permission"
+            f"{ColorFormat.YELLOW}/xperms removeperm <name> <perm> {ColorFormat.GRAY}— Remove permission"
         )
         sender.send_message(
-            f"{ColorFormat.YELLOW}/xperms user <player> setgroup <group> {ColorFormat.GRAY}— Set player group"
+            f"{ColorFormat.YELLOW}/xperms setgroup <player> <group> {ColorFormat.GRAY}— Set player group"
         )
-        sender.send_message(f"{ColorFormat.YELLOW}/xperms user <player> info {ColorFormat.GRAY}— Show player info")
+        sender.send_message(f"{ColorFormat.YELLOW}/xperms playerinfo <player> {ColorFormat.GRAY}— Show player info")
         sender.send_message(f"{ColorFormat.YELLOW}/xperms reload {ColorFormat.GRAY}— Reload data & config")

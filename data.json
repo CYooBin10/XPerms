@@ -3,8 +3,19 @@
     "default": {
       "prefix": "§7[Member]",
       "suffix": "",
-      "permissions": []
+      "permissions": [],
+      "chat_format": "{prefix} {name}{suffix}§r: {message}"
+    },
+    "founder": {
+      "prefix": "§f[Founder]",
+      "suffix": "",
+      "permissions": [],
+      "chat_format": "{prefix} {name}{suffix}§r >> {message}"
     }
   },
-  "users": {}
+  "users": {
+    "baorzk": {
+      "group": "founder"
+    }
+  }
 }

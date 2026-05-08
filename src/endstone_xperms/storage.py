@@ -18,7 +18,7 @@ class Storage:
         Args:
             data_folder: Đường dẫn đến thư mục data của plugin (plugin.data_folder).
         """
-        self._file_path = os.path.join(data_folder, "data.json")
+        self._file_path = os.path.join(str(data_folder), "data.json")
         self._data: dict = {"groups": {}, "users": {}}
         self.load()
 
@@ -34,11 +34,13 @@ class Storage:
         else:
             # Tạo dữ liệu mặc định với group "default"
             self._data = {
+                "default_group": "default",
                 "groups": {
                     "default": {
                         "prefix": "§7[Member]",
                         "suffix": "",
                         "permissions": [],
+                        "chat_format": "{prefix} {name}{suffix}§r: {message}"
                     }
                 },
                 "users": {},
@@ -65,6 +67,7 @@ class Storage:
             "prefix": f"§f[{name}]",
             "suffix": "",
             "permissions": [],
+            "chat_format": "{prefix} {name}{suffix}§r: {message}"
         }
         self.save()
         return True
@@ -91,9 +94,16 @@ class Storage:
     def get_all_groups(self) -> dict:
         """Trả về dict chứa tất cả các group."""
         return self._data["groups"]
+    
+    def set_format(self, group_name: str, format: str) -> bool:
+        group = self.get_group(group_name)
+        if group is None:
+            return False
+        group["chat_format"] = format
+        self.save()
+        return True
 
     def set_prefix(self, group_name: str, prefix: str) -> bool:
-        """Đặt prefix cho group. Trả về False nếu group không tồn tại."""
         group = self.get_group(group_name)
         if group is None:
             return False
@@ -102,7 +112,6 @@ class Storage:
         return True
 
     def set_suffix(self, group_name: str, suffix: str) -> bool:
-        """Đặt suffix cho group. Trả về False nếu group không tồn tại."""
         group = self.get_group(group_name)
         if group is None:
             return False
