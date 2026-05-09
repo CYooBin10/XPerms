@@ -26,7 +26,6 @@ The plugin uses JSON for data storage. Configuration files are automatically gen
 ### Default Files
 
 - `plugins/XPerms/data.json` - Stores groups and player data
-- `plugins/XPerms/config.toml` - Server configuration
 
 ### Data Structure (data.json)
 
