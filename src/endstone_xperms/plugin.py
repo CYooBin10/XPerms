@@ -13,7 +13,7 @@ class XPermsPlugin(Plugin):
 
     commands = {
         "xperms": {
-            "description": "Quản lý group, rank và permission của người chơi",
+            "description": "Manage player groups, ranks, and permissions",
             "usages": [
                 "/xperms groups",
                 "/xperms create <name: str>",
@@ -34,7 +34,7 @@ class XPermsPlugin(Plugin):
 
     permissions = {
         "xperms.admin": {
-            "description": "Cho phép sử dụng tất cả lệnh /xperms",
+            "description": "Allow access to all /xperms commands",
             "default": "op",
         },
     }
@@ -229,20 +229,19 @@ class XPermsPlugin(Plugin):
         return True
 
     # ================================================================== #
-    #  Helper — Cập nhật tất cả player online
+    #  Helper — Update all online players
     # ================================================================== #
 
     def _refresh_online_players(self) -> None:
-        """Cập nhật lại name tag cho tất cả player đang online."""
         for player in self.server.online_players:
             self._listener._apply_name_tag(player)
 
     # ================================================================== #
-    #  Helper — Hiển thị hướng dẫn sử dụng
+    #  Helper — Display usage help
     # ================================================================== #
 
     def _send_help(self, sender: CommandSender) -> None:
-        """Gửi tin nhắn hướng dẫn sử dụng lệnh /xperms."""
+        """Send command usage help message."""
         sender.send_message(f"{ColorFormat.GOLD}===== XPerms Help =====")
         sender.send_message(f"{ColorFormat.YELLOW}/xperms groups {ColorFormat.GRAY}— List all groups")
         sender.send_message(f"{ColorFormat.YELLOW}/xperms create <name> {ColorFormat.GRAY}— Create group")
