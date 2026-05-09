@@ -5,7 +5,7 @@ from endstone.event import (
     EventPriority,
     PlayerChatEvent,
     PlayerJoinEvent,
-    PlayerLeaveEvent,
+    PlayerQuitEvent,
     event_handler,
 )
 
@@ -50,7 +50,7 @@ class XPermsListener:
         )
 
     @event_handler(priority=EventPriority.NORMAL)
-    def on_player_leave(self, event: PlayerLeaveEvent) -> None:
+    def on_player_quit(self, event: PlayerQuitEvent) -> None:
         player_name = event.player.name
         if player_name in self._player_attachments:
             del self._player_attachments[player_name]
