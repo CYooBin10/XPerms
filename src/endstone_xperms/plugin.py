@@ -45,7 +45,15 @@ class XPermsPlugin(Plugin):
         self._listener = XPermsListener(self)
         self.register_events(self._listener)
 
-        self.logger.info(f"XPerms v1.0.0 enabled! Loaded {len(self.storage.get_all_groups())} groups.")
+        papi = self.server.plugin_manager.get_plugin("jwplaceholderapi")
+        if papi:
+            from .xperms_expansion import XPermsExpansion
+            try:
+                papi.register_expansion(XPermsExpansion(self))
+            except Exception as e:
+                self.logger.warning(f"Failed to register PlaceholderAPI expansion: {e}")
+
+        self.logger.info(f"XPerms v1.0.1 enabled! Loaded {len(self.storage.get_all_groups())} groups.")
 
     @override
     def on_disable(self) -> None:
