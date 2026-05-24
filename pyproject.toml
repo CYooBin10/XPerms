@@ -5,7 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "endstone-xperms"
 version = "1.0.1"
-dependencies = ["typing_extensions>=4.0"]
+dependencies = [
+    "typing_extensions>=4.0",
+    "jwplaceholderapi @ https://github.com/junggamyeon/JWPlaceholderAPI.git"
+]
 authors = [
     { name = "CYooBin10" },
 ]
