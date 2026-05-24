@@ -10,6 +10,8 @@ from .storage import Storage
 class XPermsPlugin(Plugin):
     prefix = "XPerms"
     api_version = "0.11"
+    authors = ["CYooBin10"]
+    depend = ["jwplaceholderapi"]
 
     commands = {
         "xperms": {
