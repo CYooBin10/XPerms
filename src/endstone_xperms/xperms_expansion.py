@@ -15,7 +15,7 @@ class XPermsExpansion(PlaceholderExpansion):
         return "xperm"
 
     def get_author(self) -> str:
-        return "JWDev"
+        return "CYooBin10"
 
     def get_version(self) -> str:
         return "1.0.2"
