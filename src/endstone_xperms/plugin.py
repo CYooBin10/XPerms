@@ -12,6 +12,7 @@ class XPermsPlugin(Plugin):
     api_version = "0.11"
     authors = ["CYooBin10"]
     depend = ["jwplaceholderapi"]
+    version = "1.0.2"
 
     commands = {
         "xperms": {
@@ -55,7 +56,7 @@ class XPermsPlugin(Plugin):
             except Exception as e:
                 self.logger.warning(f"Failed to register PlaceholderAPI expansion: {e}")
 
-        self.logger.info(f"XPerms v1.0.1 enabled! Loaded {len(self.storage.get_all_groups())} groups.")
+        self.logger.info(f"XPerms v1.0.2 enabled! Loaded {len(self.storage.get_all_groups())} groups.")
 
     @override
     def on_disable(self) -> None:

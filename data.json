@@ -1,0 +1,12 @@
+{
+  "default_group": "default",
+  "groups": {
+    "default": {
+      "prefix": "§7[Member]",
+      "suffix": "",
+      "permissions": [],
+      "chat_format": "{prefix} {name}{suffix}§r: {message}"
+    }
+  },
+  "users": {}
+}
