@@ -18,7 +18,7 @@ class XPermsExpansion(PlaceholderExpansion):
         return "JWDev"
 
     def get_version(self) -> str:
-        return "1.0.1"
+        return "1.0.2"
 
     def on_request(self, player: Optional[Player], params: str) -> Optional[str]:
         if not player:
