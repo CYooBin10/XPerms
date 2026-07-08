@@ -4,7 +4,7 @@
   <p>Plugin manages player permissions (Rank/Permission) and prefixes (Suffixes) on the Minecraft Bedrock Edition (Endstone) server.</p>
 </div>
 
-[![Downloads](https://endgit.dev/shield.dl.total/xperms)](https://endgit.dev/plugins/xperms) [![Status](https://endgit.dev/shield.state/xperms)](https://endgit.dev/plugins/xperms) [![Rating](https://endgit.dev/shield.rating/xperms)](https://endgit.dev/plugins/xperms)
+[![Downloads](https://endgit.dev/shield.dl.total/xperms)](https://endgit.dev/plugins/xperms) [![Status](https://endgit.dev/shield.state/xperms)](https://endgit.dev/plugins/xperms) [![API](https://endgit.dev/shield.api/xperms)](https://endgit.dev/plugins/xperms)
 ## Overview
 
 XPerms is a lightweight, easy-to-use permission management plugin for Endstone servers. It allows you to create groups, assign permissions, and customize player prefixes and suffixes for an enhanced server experience.
