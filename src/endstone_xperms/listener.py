@@ -21,71 +21,69 @@ class XPermsListener:
     @event_handler(priority=EventPriority.HIGH)
     def on_player_chat(self, event: PlayerChatEvent) -> None:
         player = event.player
-        storage = self._plugin.storage
-        group = storage.get_user_group(player.name)
-        prefix = group.get("prefix", "")
-        suffix = group.get("suffix", "")
-        chat_format = group.get("chat_format", "{prefix} {name}{suffix}§r: {message}")
-        formatted = chat_format.replace("{prefix}", prefix)
-        formatted = formatted.replace("{name}", player.name)
-        formatted = formatted.replace("{suffix}", suffix)
-        formatted = formatted.replace("{message}", event.message)
+        group = self._plugin.storage.get_user_group(player.name)
+        message = event.message
+        formatted = group.get("chat_format", "{prefix} {name}{suffix}§r: {message}")
         event.message = ""
-        event.format = formatted
+        event.format = formatted.replace("{prefix}", group.get("prefix", "")).replace(
+            "{name}", player.name
+        ).replace("{suffix}", group.get("suffix", "")).replace("{message}", message)
 
     @event_handler(priority=EventPriority.NORMAL)
     def on_player_join(self, event: PlayerJoinEvent) -> None:
         player = event.player
         storage = self._plugin.storage
-
         if not storage.has_user(player.name):
-            storage.set_user_group(player.name, storage._default_group)
-        self._apply_name_tag(player)
-        self._apply_permissions(player)
-
-        self._plugin.logger.info(
-            f"{player.name} joined | Group: {storage.get_user_group_name(player.name)}"
-        )
+            if storage.set_user_group(player.name, storage.default_group):
+                self._plugin._schedule_flush()
+        self.refresh_player(player)
+        self._plugin.logger.info(f"{player.name} joined | Group: {storage.get_user_group_name(player.name)}")
 
     @event_handler(priority=EventPriority.NORMAL)
     def on_player_quit(self, event: PlayerQuitEvent) -> None:
-        player_name = event.player.name.lower()
-        if player_name in self._player_attachments:
-            del self._player_attachments[player_name]
+        self._clear_permissions(event.player)
 
-    def _apply_name_tag(self, player: Player) -> None:
-        storage = self._plugin.storage
-        group = storage.get_user_group(player.name)
-        prefix = group.get("prefix", "")
+    def refresh_player(self, player: Player) -> None:
+        self.refresh_name_tag(player)
+        self.refresh_permissions(player)
 
-        if prefix:
-            player.name_tag = f"{prefix} §r{player.name}"
-        else:
-            player.name_tag = player.name
-
-    def _apply_permissions(self, player: Player) -> None:
-        storage = self._plugin.storage
-        group = storage.get_user_group(player.name)
-        permissions = group.get("permissions", [])
-
+    def refresh_permissions(self, player: Player) -> None:
         self._clear_permissions(player)
+        permissions = self._plugin.storage.get_user_group(player.name).get("permissions", [])
+        if not permissions:
+            return
+        try:
+            attachment = player.add_attachment(self._plugin)
+            for permission in permissions:
+                attachment.set_permission(permission, True)
+            self._player_attachments[player.name.lower()] = attachment
+        except Exception as error:
+            self._plugin.logger.warning(f"Could not apply permissions to {player.name}: {error}")
 
-        key = player.name.lower()
-        for perm in permissions:
-            try:
-                attachment = player.add_attachment(self._plugin, perm, True)
-                if key not in self._player_attachments:
-                    self._player_attachments[key] = []
-                self._player_attachments[key].append(attachment)
-            except Exception as e:
-                self._plugin.logger.warning(f"Could not attach permission '{perm}' to {player.name}: {e}")
+    def refresh_name_tag(self, player: Player) -> None:
+        prefix = self._plugin.storage.get_user_group(player.name).get("prefix", "")
+        player.name_tag = f"{prefix} §r{player.name}" if prefix else player.name
+
+    def refresh_permissions_for_group(self, group_name: str) -> None:
+        for player in self._plugin.server.online_players:
+            if self._plugin.storage.get_user_group_name(player.name) == group_name.lower():
+                self.refresh_permissions(player)
+
+    def refresh_name_tags_for_group(self, group_name: str) -> None:
+        for player in self._plugin.server.online_players:
+            if self._plugin.storage.get_user_group_name(player.name) == group_name.lower():
+                self.refresh_name_tag(player)
+
+    def refresh_all_players(self) -> None:
+        for player in self._plugin.server.online_players:
+            self.refresh_player(player)
 
     def _clear_permissions(self, player: Player) -> None:
         key = player.name.lower()
-        if key in self._player_attachments:
-            for attachment in self._player_attachments[key]:
-                try:
-                    player.remove_attachment(attachment)
-                except Exception as e:
-                    self._plugin.logger.warning(f"Could not remove attachment from {player.name}: {e}")
-            self._player_attachments[key] = []
+        attachment = self._player_attachments.pop(key, None)
+        if attachment is None:
+            return
+        try:
+            player.remove_attachment(attachment)
+        except Exception as error:
+            self._plugin.logger.warning(f"Could not remove attachment from {player.name}: {error}")

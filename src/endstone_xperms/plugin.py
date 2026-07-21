@@ -30,6 +30,8 @@ class XPermsPlugin(Plugin):
                 "/xperms setgroup <player: str> <group: str>",
                 "/xperms playerinfo <player: str>",
                 "/xperms reload",
+                "/xperms default",
+                "/xperms setdefault <group: str>",
             ],
             "permissions": ["xperms.admin"],
         },
@@ -44,7 +46,8 @@ class XPermsPlugin(Plugin):
 
     @override
     def on_enable(self) -> None:
-        self.storage = Storage(str(self.data_folder))
+        self.storage = Storage(str(self.data_folder), self.logger)
+        self._flush_task = None
         self._listener = XPermsListener(self)
         self.register_events(self._listener)
 
@@ -60,7 +63,9 @@ class XPermsPlugin(Plugin):
 
     @override
     def on_disable(self) -> None:
-        self.storage.save()
+        if self._flush_task:
+            self._flush_task.cancel()
+        self.storage.flush()
         self.logger.info("XPerms disabled. Data saved.")
 
     @override
@@ -99,9 +104,23 @@ class XPermsPlugin(Plugin):
         # Other
         elif action == "reload":
             return self._cmd_reload(sender)
+        elif action == "default":
+            return self._cmd_default_group(sender)
+        elif action == "setdefault" and len(args) >= 2:
+            return self._cmd_set_default_group(sender, args[1])
         else:
             self._send_help(sender)
             return True
+
+    def _schedule_flush(self) -> None:
+        if self._flush_task and not self._flush_task.is_cancelled:
+            return
+
+        def flush() -> None:
+            self.storage.flush()
+            self._flush_task = None
+
+        self._flush_task = self.server.scheduler.run_task(self, flush, delay=20)
 
     def _cmd_groups(self, sender: CommandSender) -> bool:
         groups = self.storage.get_all_groups()
@@ -119,21 +138,30 @@ class XPermsPlugin(Plugin):
 
     def _cmd_create_group(self, sender: CommandSender, group_name: str) -> bool:
         if self.storage.create_group(group_name):
+            self._schedule_flush()
             sender.send_message(f"{ColorFormat.GREEN}Group '{group_name}' created successfully!")
         else:
             sender.send_error_message(f"Group '{group_name}' already exists!")
         return True
 
     def _cmd_delete_group(self, sender: CommandSender, group_name: str) -> bool:
-        if group_name.lower() == "default":
-            sender.send_error_message("Cannot delete the 'default' group!")
+        if group_name.strip().lower() == self.storage.default_group:
+            sender.send_error_message(
+                f"Cannot delete the default group '{self.storage.default_group}'!"
+            )
             return True
+        affected = [
+            player for player in self.server.online_players
+            if self.storage.get_user_group_name(player.name) == group_name.strip().lower()
+        ]
         if self.storage.delete_group(group_name):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Group '{group_name}' deleted. "
-                f"Affected users moved to 'default'."
+                f"Affected users moved to '{self.storage.default_group}'."
             )
-            self._refresh_online_players()
+            for player in affected:
+                self._listener.refresh_player(player)
         else:
             sender.send_error_message(f"Group '{group_name}' does not exist!")
         return True
@@ -155,42 +183,44 @@ class XPermsPlugin(Plugin):
 
     def _cmd_set_format(self, sender: CommandSender, group_name: str, format: str) -> bool:
         if self.storage.set_format(group_name, format):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Chat format of '{group_name}' set to: {ColorFormat.RESET}{format}"
             )
-            self._refresh_online_players()
         else:
-            sender.send_error_message(f"Group '{group_name}' does not exist!")
+            sender.send_error_message(f"Group '{group_name}' does not exist or format is unchanged!")
         return True
 
     def _cmd_set_prefix(self, sender: CommandSender, group_name: str, extra: list[str]) -> bool:
         prefix = " ".join(extra)
         if self.storage.set_prefix(group_name, prefix):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Prefix of '{group_name}' set to: {ColorFormat.RESET}{prefix}"
             )
-            self._refresh_online_players()
+            self._listener.refresh_name_tags_for_group(group_name)
         else:
-            sender.send_error_message(f"Group '{group_name}' does not exist!")
+            sender.send_error_message(f"Group '{group_name}' does not exist or prefix is unchanged!")
         return True
 
     def _cmd_set_suffix(self, sender: CommandSender, group_name: str, extra: list[str]) -> bool:
         suffix = " ".join(extra)
         if self.storage.set_suffix(group_name, suffix):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Suffix of '{group_name}' set to: {ColorFormat.RESET}{suffix}"
             )
-            self._refresh_online_players()
         else:
-            sender.send_error_message(f"Group '{group_name}' does not exist!")
+            sender.send_error_message(f"Group '{group_name}' does not exist or suffix is unchanged!")
         return True
 
     def _cmd_add_perm(self, sender: CommandSender, group_name: str, perm: str) -> bool:
         if self.storage.add_permission(group_name, perm):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Permission '{perm}' added to group '{group_name}'."
             )
-            self._refresh_online_players()
+            self._listener.refresh_permissions_for_group(group_name)
         else:
             sender.send_error_message(
                 f"Group '{group_name}' does not exist or already has this permission."
@@ -199,10 +229,11 @@ class XPermsPlugin(Plugin):
 
     def _cmd_remove_perm(self, sender: CommandSender, group_name: str, perm: str) -> bool:
         if self.storage.remove_permission(group_name, perm):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Permission '{perm}' removed from group '{group_name}'."
             )
-            self._refresh_online_players()
+            self._listener.refresh_permissions_for_group(group_name)
         else:
             sender.send_error_message(
                 f"Group '{group_name}' does not exist or doesn't have this permission."
@@ -211,13 +242,13 @@ class XPermsPlugin(Plugin):
 
     def _cmd_set_group(self, sender: CommandSender, player_name: str, group_name: str) -> bool:
         if self.storage.set_user_group(player_name, group_name):
+            self._schedule_flush()
             sender.send_message(
                 f"{ColorFormat.GREEN}Player '{player_name}' is now in group '{group_name}'."
             )
             online_player = self.server.get_player(player_name)
             if online_player:
-                self._listener._apply_name_tag(online_player)
-                self._listener._apply_permissions(online_player)
+                self._listener.refresh_player(online_player)
         else:
             sender.send_error_message(f"Group '{group_name}' does not exist!")
         return True
@@ -232,23 +263,27 @@ class XPermsPlugin(Plugin):
         return True
 
     def _cmd_reload(self, sender: CommandSender) -> bool:
-        self.storage.load()
-        # self.reload_config()
-        self._refresh_online_players()
+        if not self.storage.load():
+            sender.send_error_message("XPerms reload failed; active data was kept.")
+            return True
+        self._listener.refresh_all_players()
         sender.send_message(
             f"{ColorFormat.GREEN}XPerms data & config reloaded! "
             f"({len(self.storage.get_all_groups())} groups loaded)"
         )
         return True
 
-    # ================================================================== #
-    #  Helper — Update all online players
-    # ================================================================== #
+    def _cmd_default_group(self, sender: CommandSender) -> bool:
+        sender.send_message(f"Default group: {self.storage.default_group}")
+        return True
 
-    def _refresh_online_players(self) -> None:
-        for player in self.server.online_players:
-            self._listener._apply_name_tag(player)
-            self._listener._apply_permissions(player)
+    def _cmd_set_default_group(self, sender: CommandSender, group_name: str) -> bool:
+        if self.storage.set_default_group(group_name):
+            self._schedule_flush()
+            sender.send_message(f"Default group set to '{self.storage.default_group}'.")
+        else:
+            sender.send_error_message(f"Group '{group_name}' does not exist or is already default.")
+        return True
 
     # ================================================================== #
     #  Helper — Display usage help
