@@ -1,4 +1,4 @@
-from endstone import ColorFormat, Player
+from endstone import ColorFormat
 from endstone.command import Command, CommandSender
 from endstone.plugin import Plugin
 from typing_extensions import override
@@ -190,6 +190,7 @@ class XPermsPlugin(Plugin):
             sender.send_message(
                 f"{ColorFormat.GREEN}Permission '{perm}' added to group '{group_name}'."
             )
+            self._refresh_online_players()
         else:
             sender.send_error_message(
                 f"Group '{group_name}' does not exist or already has this permission."
@@ -201,6 +202,7 @@ class XPermsPlugin(Plugin):
             sender.send_message(
                 f"{ColorFormat.GREEN}Permission '{perm}' removed from group '{group_name}'."
             )
+            self._refresh_online_players()
         else:
             sender.send_error_message(
                 f"Group '{group_name}' does not exist or doesn't have this permission."
@@ -246,6 +248,7 @@ class XPermsPlugin(Plugin):
     def _refresh_online_players(self) -> None:
         for player in self.server.online_players:
             self._listener._apply_name_tag(player)
+            self._listener._apply_permissions(player)
 
     # ================================================================== #
     #  Helper — Display usage help

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from endstone import ColorFormat, Player
+from endstone import Player
 from endstone.event import (
     EventPriority,
     PlayerChatEvent,
@@ -38,10 +38,8 @@ class XPermsListener:
         player = event.player
         storage = self._plugin.storage
 
-        group = storage.get_user_group(player.name)
-        default_group = group.get("default_group", "default")
-        if player.name.lower() not in storage._load_all_users():
-            storage.set_user_group(player.name, default_group)
+        if not storage.has_user(player.name):
+            storage.set_user_group(player.name, storage._default_group)
         self._apply_name_tag(player)
         self._apply_permissions(player)
 
@@ -51,7 +49,7 @@ class XPermsListener:
 
     @event_handler(priority=EventPriority.NORMAL)
     def on_player_quit(self, event: PlayerQuitEvent) -> None:
-        player_name = event.player.name
+        player_name = event.player.name.lower()
         if player_name in self._player_attachments:
             del self._player_attachments[player_name]
 
@@ -72,20 +70,22 @@ class XPermsListener:
 
         self._clear_permissions(player)
 
+        key = player.name.lower()
         for perm in permissions:
             try:
                 attachment = player.add_attachment(self._plugin, perm, True)
-                if player.name not in self._player_attachments:
-                    self._player_attachments[player.name] = []
-                self._player_attachments[player.name].append(attachment)
+                if key not in self._player_attachments:
+                    self._player_attachments[key] = []
+                self._player_attachments[key].append(attachment)
             except Exception as e:
                 self._plugin.logger.warning(f"Could not attach permission '{perm}' to {player.name}: {e}")
 
     def _clear_permissions(self, player: Player) -> None:
-        if player.name in self._player_attachments:
-            for attachment in self._player_attachments[player.name]:
+        key = player.name.lower()
+        if key in self._player_attachments:
+            for attachment in self._player_attachments[key]:
                 try:
                     player.remove_attachment(attachment)
                 except Exception as e:
                     self._plugin.logger.warning(f"Could not remove attachment from {player.name}: {e}")
-            self._player_attachments[player.name] = []
+            self._player_attachments[key] = []

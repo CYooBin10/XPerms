@@ -7,6 +7,7 @@ class Storage:
     def __init__(self, data_folder: str) -> None:
         self._file_path = os.path.join(str(data_folder), "data.json")
         self._groups: dict = {}
+        self._users: dict = {}
         self._default_group = "default"
         self.load()
 
@@ -15,6 +16,7 @@ class Storage:
             with open(self._file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self._groups = data.get("groups", {})
+                self._users = data.get("users", {})
                 self._default_group = data.get("default_group", "default")
         else:
             self._groups = {
@@ -25,6 +27,7 @@ class Storage:
                     "chat_format": "{prefix} {name}{suffix}§r: {message}"
                 }
             }
+            self._users = {}
             self._default_group = "default"
             self.save()
 
@@ -33,31 +36,16 @@ class Storage:
         data_to_save = {
             "default_group": self._default_group,
             "groups": self._groups,
-            "users": self._load_all_users()
+            "users": self._users
         }
         with open(self._file_path, "w", encoding="utf-8") as f:
             json.dump(data_to_save, f, indent=2, ensure_ascii=False)
 
-    def _load_all_users(self) -> dict:
-        if not os.path.exists(self._file_path):
-            return {}
-        with open(self._file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("users", {})
+    def has_user(self, player_name: str) -> bool:
+        return player_name.lower() in self._users
 
     def _load_user(self, player_name: str) -> dict:
-        users = self._load_all_users()
-        return users.get(player_name.lower(), {})
-
-    def _save_users(self, users: dict) -> None:
-        os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
-        data = {
-            "default_group": self._default_group,
-            "groups": self._groups,
-            "users": users
-        }
-        with open(self._file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        return self._users.get(player_name.lower(), {})
 
     def create_group(self, name: str) -> bool:
         key = name.lower()
@@ -79,11 +67,10 @@ class Storage:
         if key not in self._groups:
             return False
         del self._groups[key]
-        users = self._load_all_users()
-        for user_data in users.values():
+        for user_data in self._users.values():
             if user_data.get("group", "").lower() == key:
-                user_data["group"] = "default"
-        self._save_users(users)
+                user_data["group"] = self._default_group
+        self.save()
         return True
 
     def get_group(self, name: str) -> Optional[dict]:
@@ -140,22 +127,21 @@ class Storage:
         if self.get_group(group_name) is None:
             return False
         key = player_name.lower()
-        users = self._load_all_users()
-        if key not in users:
-            users[key] = {}
-        users[key]["group"] = group_name.lower()
-        self._save_users(users)
+        if key not in self._users:
+            self._users[key] = {}
+        self._users[key]["group"] = group_name.lower()
+        self.save()
         return True
 
     def get_user_group_name(self, player_name: str) -> str:
         user = self._load_user(player_name)
         if not user:
-            return "default"
-        return user.get("group", "default")
+            return self._default_group
+        return user.get("group", self._default_group)
 
     def get_user_group(self, player_name: str) -> dict:
         group_name = self.get_user_group_name(player_name)
         group = self.get_group(group_name)
         if group is None:
-            return self.get_group("default") or {"prefix": "", "suffix": "", "permissions": []}
+            return self.get_group(self._default_group) or {"prefix": "", "suffix": "", "permissions": []}
         return group
