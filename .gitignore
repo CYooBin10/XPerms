@@ -1,4 +1,9 @@
 dist/
 *.egg-info/
 __pycache__/
+.ruff_cache/
 .venv/
+audit.jsonl*
+tracks.json
+*.tmp
+*.bak

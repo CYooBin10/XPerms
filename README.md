@@ -1,3 +1,11 @@
+<div align="center">
+  <img src="icon.png" alt="XPerms Icon" width="150" height="150">
+  <h2>XPerms</h2>
+  <p>Plugin manages player permissions (Rank/Permission) and prefixes (Suffixes) on the Minecraft Bedrock Edition (Endstone) server.</p>
+</div>
+
+[![Downloads](https://endgit.dev/shield.dl.total/xperms)](https://endgit.dev/plugins/xperms) [![Status](https://endgit.dev/shield.state/xperms)](https://endgit.dev/plugins/xperms) [![API](https://endgit.dev/shield.api/xperms)](https://endgit.dev/plugins/xperms)
+
 # XPerms
 
 XPerms is permission, group, prefix, suffix, and chat-format plugin for Endstone Bedrock servers. Version 2 uses schema v2 storage, deterministic permission resolution, multi-group membership, inheritance, contexts, and temporary permission nodes.
