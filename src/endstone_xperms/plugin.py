@@ -17,7 +17,7 @@ class XPermsPlugin(Plugin):
     api_version = "0.11"
     authors = ["CYooBin10"]
     depend = ["jwplaceholderapi"]
-    version = "2.0.1"
+    version = "2.0.0"
 
     commands = {
         "xperms": {
