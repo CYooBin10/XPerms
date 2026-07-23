@@ -53,7 +53,7 @@ All commands start with `/xperms`.
 
 | Command | Action |
 |---|---|
-| `user <player> permission set <node> [true|false]` | Set direct boolean user node |
+| `user <player> permission set <node> [true/false]` | Set direct boolean user node |
 | `user <player> permission unset <node>` | Remove direct user node |
 | `user <player> permission check <node>` | Check resolved node for user |
 | `user <player> group add <group>` | Add membership |
